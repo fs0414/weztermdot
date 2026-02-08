@@ -1,11 +1,11 @@
 #!/bin/bash
-# WezTermオーバーレイペイン: split-pane + zoom-paneで元ペインを覆う
-# プログラム終了時にペインが自動閉鎖→unzoom→元ペイン復元
+# WezTerm overlay pane: split-pane + zoom-pane to cover the current pane
+# Auto-closes on program exit → unzoom → original pane restored
 
 set -euo pipefail
 
 if [ -z "${WEZTERM_PANE:-}" ]; then
-  echo "Error: WezTerm環境外です" >&2
+  echo "Error: not running inside WezTerm" >&2
   exit 1
 fi
 
