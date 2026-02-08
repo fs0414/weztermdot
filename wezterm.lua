@@ -3,15 +3,15 @@ local wezterm = require("wezterm")
 local config = wezterm.config_builder()
 local act = wezterm.action
 
-config.automatically_reload_config = false
+config.automatically_reload_config = true
 config.hyperlink_rules = wezterm.default_hyperlink_rules()
 
 -- set leader
-config.leader = { key = "a", mods = "CMD", timeout_milliseconds = 2000 }
+config.leader = { key = "a", mods = "CTRL", timeout_milliseconds = 2001 }
 
 -- font size
 config.font_size = 14.0
-wezterm.font("Hack Nerd Font", { weight = "Regular", stretch = "Normal", style = "Normal" })
+config.font = wezterm.font("Hack Nerd Font", { weight = "Regular", stretch = "Normal", style = "Normal" })
 
 -- right status
 wezterm.on("update-right-status", function(window)
@@ -38,14 +38,13 @@ config.tab_bar_at_bottom = false
 config.window_decorations = "RESIZE"
 config.show_new_tab_button_in_tab_bar = false
 config.tab_bar_at_bottom = false
-config.colors =
-	{
-		tab_bar = {
-			inactive_tab_edge = "none",
-		},
+config.colors = {
+	tab_bar = {
+		inactive_tab_edge = "none",
 	},
-	--
-	wezterm.on("format-tab-title", function(tab)
+}
+
+wezterm.on("format-tab-title", function(tab)
 		local scheme = wezterm.color.get_builtin_schemes()[config.color_scheme]
 		local background = scheme.background
 		local foreground = scheme.foreground
@@ -73,7 +72,7 @@ config.keys = {
 		key = "r",
 		mods = "CMD|SHIFT",
 		action = wezterm.action.ReloadConfiguration,
-	},
+ },
 	-- close tab
 	{
 		key = "w",
@@ -91,36 +90,37 @@ config.keys = {
 		mods = "CMD",
 		action = act({ SplitHorizontal = { domain = "CurrentPaneDomain" } }),
 	},
+	-- pane move (SHIFT + Arrow)
 	{
 		key = "LeftArrow",
-		mods = "CMD",
+		mods = "SHIFT",
 		action = act.ActivatePaneDirection("Left"),
 	},
 	{
 		key = "RightArrow",
-		mods = "CMD",
+		mods = "SHIFT",
 		action = act.ActivatePaneDirection("Right"),
 	},
 	{
 		key = "UpArrow",
-		mods = "CMD",
+		mods = "SHIFT",
 		action = act.ActivatePaneDirection("Up"),
 	},
 	{
 		key = "DownArrow",
-		mods = "CMD",
+		mods = "SHIFT",
 		action = act.ActivatePaneDirection("Down"),
 	},
-	-- workspace
+	-- workspace (CMD + Left/Right)
 	{
 		key = "LeftArrow",
-		mods = "ALT",
-		action = act.SwitchWorkspaceRelative(1),
+		mods = "CMD",
+		action = act.SwitchWorkspaceRelative(-1),
 	},
 	{
 		key = "RightArrow",
-		mods = "ALT",
-		action = act.SwitchWorkspaceRelative(-1),
+		mods = "CMD",
+		action = act.SwitchWorkspaceRelative(1),
 	},
 	{
 		key = "9",
@@ -130,5 +130,11 @@ config.keys = {
 		}),
 	},
 	{ key = "Enter", mods = "SHIFT", action = act.SendString("\n") },
+  {
+    key = 'n',
+    mods = 'CTRL',
+    action = wezterm.action.TogglePaneZoomState,
+  },
 }
-return config, {}
+
+return config
