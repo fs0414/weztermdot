@@ -1,84 +1,83 @@
-# WezTerm 設定
+# WezTerm Config
 
-macOS 向けの WezTerm ターミナル設定。
+WezTerm terminal configuration for macOS.
 
-## 概要
+## Overview
 
-- **フォント**: Hack Nerd Font (14pt)
-- **カラースキーム**: Ef-Night
-- **半透明背景**: opacity 0.92 + blur 20
-- **タブバー**: シンプルなスタイル（カラースキームと統一）
-- **IME**: 有効
-- **Leader キー**: `Ctrl+A`
+- **Font**: Hack Nerd Font (14pt)
+- **Color Scheme**: Ef-Night
+- **Translucent Background**: opacity 0.92 + blur 20
+- **Tab Bar**: Minimal style (matches color scheme)
+- **IME**: Enabled
+- **Leader Key**: `Ctrl+A`
 
-### キーバインド
+### Key Bindings
 
-| キー | 動作 |
+| Key | Action |
 |---|---|
-| `Cmd+Shift+R` | 設定リロード |
-| `Cmd+W` | ペイン閉じる |
-| `Cmd+,` | 縦分割 |
-| `Cmd+.` | 横分割 |
-| `Shift+矢印` | ペイン移動 |
-| `Cmd+左/右` | ワークスペース切替 |
-| `Alt+9` | ワークスペース一覧 (Fuzzy) |
-| `Ctrl+N` | ペインズーム切替 |
+| `Cmd+Shift+R` | Reload config |
+| `Cmd+W` | Close pane |
+| `Cmd+,` | Split vertically |
+| `Cmd+.` | Split horizontally |
+| `Shift+Arrow` | Navigate panes |
+| `Cmd+Left/Right` | Switch workspace |
+| `Alt+9` | Workspace list (Fuzzy) |
+| `Ctrl+N` | Toggle pane zoom |
 
-## セットアップ
+## Setup
 
-### 1. WezTerm のインストール
+### 1. Install WezTerm
 
 ```bash
 brew install --cask wezterm
 ```
 
-### 2. フォントのインストール
+### 2. Install Font
 
 ```bash
 brew install --cask font-hack-nerd-font
 ```
 
-### 3. 設定ファイルの配置
+### 3. Clone Config
 
 ```bash
-git clone <このリポジトリのURL> ~/.config/wezterm
+git clone <repo-url> ~/.config/wezterm
 ```
 
-既に `~/.config/wezterm` がある場合は、バックアップしてから置き換えてください。
+If `~/.config/wezterm` already exists, back it up first:
 
 ```bash
 mv ~/.config/wezterm ~/.config/wezterm.bak
-git clone <このリポジトリのURL> ~/.config/wezterm
+git clone <repo-url> ~/.config/wezterm
 ```
 
-WezTerm を起動すれば設定が自動で読み込まれます。
+Launch WezTerm and the config will be loaded automatically.
 
-## wlay - オーバーレイペインコマンド
+## wlay - Overlay Pane Command
 
-`split-pane` + `zoom-pane` を組み合わせて、現在のペインを覆うオーバーレイペインを開くシェルスクリプト。
-プログラム終了時にペインが自動閉鎖され、元のペインがそのまま復元される。
+A shell script that opens an overlay pane by combining `split-pane` + `zoom-pane` to cover the current pane. The overlay pane auto-closes on program exit, restoring the original pane.
 
-### 使い方
+### Usage
 
-| コマンド | 動作 |
+| Command | Action |
 |---|---|
-| `wlay` / `wlay sh` | zsh を開く |
-| `wlay nv` | nvim を開く |
-| `wlay nv file.lua` | nvim でファイルを開く |
-| `wlay git` | lazygit を開く |
+| `wlay` / `wlay sh` | Open zsh |
+| `wlay nv` | Open nvim |
+| `wlay nv file.lua` | Open file in nvim |
+| `wlay git` | Open lazygit |
 
-サブコマンド (`sh`, `nv`, `git`) 以外の引数はそのままコマンドとして実行される（例: `wlay htop`）。
+Any argument other than the subcommands (`sh`, `nv`, `git`) is executed as-is (e.g. `wlay htop`).
 
-### セットアップ
+### Setup
 
-`~/.config/scripts/` にシンボリックリンクを作成し、PATH を通す。
+Create a symlink in `~/.config/scripts/` and add it to PATH:
 
 ```bash
 mkdir -p ~/.config/scripts
 ln -s ~/.config/wezterm/wlay ~/.config/scripts/wlay
 ```
 
-`~/.zshrc` に以下を追加:
+Add to `~/.zshrc`:
 
 ```bash
 export PATH="$HOME/.config/scripts:$PATH"
