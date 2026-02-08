@@ -52,3 +52,34 @@ git clone <このリポジトリのURL> ~/.config/wezterm
 ```
 
 WezTerm を起動すれば設定が自動で読み込まれます。
+
+## wezlay - オーバーレイペインコマンド
+
+`split-pane` + `zoom-pane` を組み合わせて、現在のペインを覆うオーバーレイペインを開くシェルスクリプト。
+プログラム終了時にペインが自動閉鎖され、元のペインがそのまま復元される。
+
+### 使い方
+
+| コマンド | 動作 |
+|---|---|
+| `wezlay` / `wezlay sh` | zsh を開く |
+| `wezlay nv` | nvim を開く |
+| `wezlay nv file.lua` | nvim でファイルを開く |
+| `wezlay git` | lazygit を開く |
+
+サブコマンド (`sh`, `nv`, `git`) 以外の引数はそのままコマンドとして実行される（例: `wezlay htop`）。
+
+### セットアップ
+
+`~/.config/scripts/` にシンボリックリンクを作成し、PATH を通す。
+
+```bash
+mkdir -p ~/.config/scripts
+ln -s ~/.config/wezterm/wezlay ~/.config/scripts/wezlay
+```
+
+`~/.zshrc` に以下を追加:
+
+```bash
+export PATH="$HOME/.config/scripts:$PATH"
+```
