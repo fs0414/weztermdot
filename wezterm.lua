@@ -2,7 +2,7 @@ local wezterm = require("wezterm")
 local config = wezterm.config_builder()
 local act = wezterm.action
 
--- オーバーレイペインでコマンドを実行するヘルパー関数
+-- Helper function to run a command in an overlay pane
 local function spawn_overlay_pane(command)
 	return wezterm.action_callback(function(window, pane)
 		local new_pane = pane:split({
@@ -60,7 +60,7 @@ wezterm.on("format-tab-title", function(tab)
 	}
 end)
 
--- ランチャーの選択肢
+-- Launcher choices
 local launcher_choices = {
 	{ label = "Neovim", command = "nvim", icon = "md_file_edit" },
 	{ label = "Lazygit", command = "lazygit", icon = "md_git" },
@@ -81,7 +81,7 @@ config.keys = {
 	{ key = "9", mods = "ALT", action = act.ShowLauncherArgs({ flags = "FUZZY|WORKSPACES" }) },
 	{ key = "Enter", mods = "SHIFT", action = act.SendString("\n") },
 	{ key = "n", mods = "CTRL", action = act.TogglePaneZoomState },
-	-- ファジーファインダーでコマンドを選択してオーバーレイペインで実行
+	-- Select a command via fuzzy finder and run it in an overlay pane
 	{
 		key = "l",
 		mods = "LEADER",
