@@ -42,6 +42,7 @@ local scheme = wezterm.color.get_builtin_schemes()[config.color_scheme]
 
 config.command_palette_bg_color = scheme.background
 config.command_palette_fg_color = scheme.foreground
+config.command_palette_font_size = 17.0
 
 config.colors = {
 	tab_bar = {

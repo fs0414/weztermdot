@@ -3,7 +3,8 @@ local act = wezterm.action
 
 local M = {}
 
-local STATUS_ICON = { idle = "○", running = "●", unknown = "?" }
+local STATUS_ICON = { idle = "⚫", running = "🔵", unknown = "?" }
+local STATUS_NERD_ICON = { idle = "md_robot_off_outline", running = "md_robot" }
 local cache = { result = {}, timestamp = 0 }
 local CACHE_TTL = 3
 
@@ -141,17 +142,11 @@ function M.dashboard_action()
 		end
 
 		local choices = {}
-		for _, agent in ipairs(agents) do
+		for _, a in ipairs(agents) do
+			local icon = STATUS_ICON[a.status] or "?"
 			table.insert(choices, {
-				label = string.format(
-					"%s %s [%s] %s  (%s)",
-					STATUS_ICON[agent.status] or "?",
-					agent.status,
-					agent.workspace,
-					agent.project,
-					agent.dir
-				),
-				id = agent.workspace,
+				label = string.format("%s %s [%s]  %s", icon, a.project, a.workspace, a.dir),
+				id = a.workspace,
 			})
 		end
 
@@ -169,25 +164,31 @@ end
 
 --- Return command palette entries for augment-command-palette.
 function M.palette_entries()
+	local agents = cache.result
+	local running_count = 0
+	for _, a in ipairs(agents) do
+		if a.status == "running" then
+			running_count = running_count + 1
+		end
+	end
+
+	local dashboard_label = #agents == 0 and "Agent Dashboard"
+		or string.format("Agent Dashboard (%d agents, %d running)", #agents, running_count)
+
 	local entries = {
 		{
-			brief = "Agent Dashboard",
+			brief = dashboard_label,
 			icon = "md_robot",
 			action = M.dashboard_action(),
 		},
 	}
-	for _, agent in ipairs(cache.result) do
+	for _, a in ipairs(agents) do
+		local icon = STATUS_ICON[a.status] or "?"
 		table.insert(entries, {
-			brief = string.format(
-				"%s %s Agent: %s [%s]",
-				STATUS_ICON[agent.status] or "?",
-				agent.status,
-				agent.project,
-				agent.workspace
-			),
-			icon = "md_robot_outline",
+			brief = string.format("Agent %s %s [%s]", icon, a.project, a.workspace),
+			icon = STATUS_NERD_ICON[a.status] or "md_robot_outline",
 			action = wezterm.action_callback(function(win, p)
-				win:perform_action(act.SwitchToWorkspace({ name = agent.workspace }), p)
+				win:perform_action(act.SwitchToWorkspace({ name = a.workspace }), p)
 			end),
 		})
 	end
