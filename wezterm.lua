@@ -209,6 +209,9 @@ config.show_new_tab_button_in_tab_bar = false
 
 local scheme = wezterm.color.get_builtin_schemes()[config.color_scheme]
 
+config.command_palette_bg_color = scheme.background
+config.command_palette_fg_color = scheme.foreground
+
 config.colors = {
 	tab_bar = {
 		inactive_tab_edge = "none",
@@ -238,6 +241,7 @@ local launcher_choices = {
 }
 
 config.keys = {
+	{ key = "p", mods = "CMD|SHIFT", action = act.ActivateCommandPalette },
 	{ key = "r", mods = "CMD|SHIFT", action = act.ReloadConfiguration },
 	{ key = "w", mods = "CMD", action = act.CloseCurrentPane({ confirm = true }) },
 	{ key = ",", mods = "CMD", action = act({ SplitVertical = { domain = "CurrentPaneDomain" } }) },
@@ -305,7 +309,6 @@ wezterm.on("augment-command-palette", function()
 		})
 	end
 
-	-- Use cached results (updated every 3s by status bar) to avoid blocking the palette
 	for _, agent in ipairs(agent_cache.result) do
 		table.insert(entries, {
 			brief = string.format(
