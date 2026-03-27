@@ -16,6 +16,56 @@ end
 -- Process-tree-aware agent scanner with caching
 local agent_cache = { result = {}, timestamp = 0 }
 local CACHE_TTL = 3
+local STATUS_ICON = { idle = "○", running = "●", unknown = "?" }
+
+-- Walk ppid chain to find a claude ancestor pid
+local function find_claude_ancestor(pid, procs, claude_pids)
+	local visited = {}
+	local current = pid
+	while current and current > 1 and not visited[current] do
+		visited[current] = true
+		if claude_pids[current] then
+			return current
+		end
+		local info = procs[current]
+		if not info then
+			break
+		end
+		current = info.ppid
+	end
+	return nil
+end
+
+-- Detect agent status for a single pane; returns status string or nil
+local function detect_pane_agent(p, procs, claude_pids, claude_status)
+	local ok_info, fg_info = pcall(function()
+		return p:get_foreground_process_info()
+	end)
+	local fg_pid = ok_info and fg_info and fg_info.pid
+
+	if fg_pid and procs[fg_pid] then
+		local cpid = find_claude_ancestor(fg_pid, procs, claude_pids)
+		return cpid and (claude_status[cpid] or "idle") or nil
+	end
+
+	-- Fallback: use process name matching
+	local proc_path = p:get_foreground_process_name() or ""
+	local proc_name = proc_path:match("([^/]+)$") or proc_path
+
+	if proc_name:find("claude") then
+		return "idle"
+	end
+
+	for pid, info in pairs(procs) do
+		if info.name == proc_name or info.fullpath == proc_path then
+			local cpid = find_claude_ancestor(pid, procs, claude_pids)
+			if cpid then
+				return claude_status[cpid] or "idle"
+			end
+		end
+	end
+	return nil
+end
 
 local function scan_agent_panes()
 	local now = os.time()
@@ -23,18 +73,24 @@ local function scan_agent_panes()
 		return agent_cache.result
 	end
 
-	-- Build pid → {ppid, name} map via ps
+	-- Build pid → {ppid, name} map and children reverse index via ps
 	local ok, stdout = wezterm.run_child_process({ "ps", "-eo", "pid,ppid,comm" })
 	local procs = {}
+	local children = {} -- ppid → [pid, ...]
 	local claude_pids = {}
 	if ok and stdout then
 		for line in stdout:gmatch("[^\n]+") do
 			local pid_s, ppid_s, comm = line:match("(%d+)%s+(%d+)%s+(.+)")
 			if pid_s then
 				local pid = tonumber(pid_s)
+				local ppid = tonumber(ppid_s)
 				local name = comm:gsub("^%s+", ""):gsub("%s+$", "")
 				local basename = name:match("([^/]+)$") or name
-				procs[pid] = { ppid = tonumber(ppid_s), name = basename, fullpath = name }
+				procs[pid] = { ppid = ppid, name = basename, fullpath = name }
+				if not children[ppid] then
+					children[ppid] = {}
+				end
+				table.insert(children[ppid], pid)
 				if basename:find("claude") then
 					claude_pids[pid] = true
 				end
@@ -42,105 +98,34 @@ local function scan_agent_panes()
 		end
 	end
 
-	-- Determine claude's status: caffeinate child = actively processing a task.
+	-- Determine claude's status via children index.
 	-- Claude Code spawns caffeinate while running and kills it when idle.
 	local claude_status = {}
-	local debug_info = {}
 	for cpid in pairs(claude_pids) do
 		local is_active = false
-		local child_names = {}
-		for pid, info in pairs(procs) do
-			if info.ppid == cpid then
-				table.insert(child_names, info.name .. "(" .. pid .. ")")
-				if info.name == "caffeinate" then
-					is_active = true
-				end
+		for _, child_pid in ipairs(children[cpid] or {}) do
+			if procs[child_pid].name == "caffeinate" then
+				is_active = true
+				break
 			end
 		end
 		claude_status[cpid] = is_active and "running" or "idle"
-		table.insert(debug_info, string.format(
-			"claude(%d)=%s children=[%s]",
-			cpid,
-			claude_status[cpid],
-			table.concat(child_names, ",")
-		))
-	end
-	wezterm.log_info("Agent scan: " .. table.concat(debug_info, " | "))
-
-	-- Walk ppid chain to find claude ancestor
-	local function find_claude_ancestor(pid)
-		local visited = {}
-		local current = pid
-		while current and current > 1 and not visited[current] do
-			visited[current] = true
-			if claude_pids[current] then
-				return current
-			end
-			local info = procs[current]
-			if not info then
-				break
-			end
-			current = info.ppid
-		end
-		return nil
 	end
 
 	-- Scan all panes
 	local agents = {}
 	for _, mux_win in ipairs(wezterm.mux.all_windows()) do
 		local workspace = mux_win:get_workspace()
-		for tab_idx, tab in ipairs(mux_win:tabs()) do
+		for _, tab in ipairs(mux_win:tabs()) do
 			for _, p in ipairs(tab:panes()) do
-				local found = false
-				local status = nil
-
-				-- Try to get exact foreground PID via get_foreground_process_info
-				local fg_pid = nil
-				local ok_info, fg_info = pcall(function()
-					return p:get_foreground_process_info()
-				end)
-				if ok_info and fg_info then
-					fg_pid = fg_info.pid
-				end
-
-				if fg_pid and procs[fg_pid] then
-					-- Exact PID available: walk ppid chain to find this pane's claude
-					local cpid = find_claude_ancestor(fg_pid)
-					if cpid then
-						found = true
-						status = claude_status[cpid] or "idle"
-					end
-				else
-					-- Fallback: use process name matching
-					local proc_path = p:get_foreground_process_name() or ""
-					local proc_name = proc_path:match("([^/]+)$") or proc_path
-
-					if proc_name:find("claude") then
-						found = true
-						status = "idle"
-					else
-						for pid, info in pairs(procs) do
-							if info.name == proc_name or info.fullpath == proc_path then
-								local cpid = find_claude_ancestor(pid)
-								if cpid then
-									found = true
-									status = claude_status[cpid] or "idle"
-									break
-								end
-							end
-						end
-					end
-				end
-
-				if found then
+				local status = detect_pane_agent(p, procs, claude_pids, claude_status)
+				if status then
 					local cwd = p:get_current_working_dir()
 					local dir = cwd and cwd.file_path or "unknown"
-					local project = dir:match("([^/]+)$") or dir
 					table.insert(agents, {
 						workspace = workspace,
-						tab_idx = tab_idx,
 						pane_id = p:pane_id(),
-						project = project,
+						project = dir:match("([^/]+)$") or dir,
 						dir = dir,
 						status = status,
 					})
@@ -154,12 +139,16 @@ local function scan_agent_panes()
 	return agents
 end
 
--- Agent dashboard: show all running agents via InputSelector, jump to selected
-local STATUS_ICON = { idle = "○", running = "●", unknown = "?" }
+-- Action: switch to the given workspace
+local function switch_to_workspace(ws)
+	return wezterm.action_callback(function(win, p)
+		win:perform_action(act.SwitchToWorkspace({ name = ws }), p)
+	end)
+end
 
+-- Agent dashboard: show all running agents via InputSelector, jump to selected
 local function open_agent_dashboard()
 	return wezterm.action_callback(function(window, pane)
-		-- Force fresh scan by invalidating cache
 		agent_cache.timestamp = 0
 		local agents = scan_agent_panes()
 		if #agents == 0 then
@@ -169,17 +158,16 @@ local function open_agent_dashboard()
 
 		local choices = {}
 		for _, agent in ipairs(agents) do
-			local icon = STATUS_ICON[agent.status] or "?"
 			table.insert(choices, {
 				label = string.format(
 					"%s %s [%s] %s  (%s)",
-					icon,
+					STATUS_ICON[agent.status] or "?",
 					agent.status,
 					agent.workspace,
 					agent.project,
 					agent.dir
 				),
-				id = tostring(agent.pane_id) .. "|" .. agent.workspace,
+				id = agent.workspace,
 			})
 		end
 
@@ -187,12 +175,8 @@ local function open_agent_dashboard()
 			title = string.format("Running Agents (%d)", #agents),
 			choices = choices,
 			action = wezterm.action_callback(function(win, p, id)
-				if not id then
-					return
-				end
-				local ws = id:match("|(.+)$")
-				if ws then
-					win:perform_action(act.SwitchToWorkspace({ name = ws }), p)
+				if id then
+					win:perform_action(act.SwitchToWorkspace({ name = id }), p)
 				end
 			end),
 		}), pane)
@@ -323,13 +307,16 @@ wezterm.on("augment-command-palette", function()
 
 	-- Use cached results (updated every 3s by status bar) to avoid blocking the palette
 	for _, agent in ipairs(agent_cache.result) do
-		local icon = STATUS_ICON[agent.status] or "?"
 		table.insert(entries, {
-			brief = string.format("%s %s Agent: %s [%s]", icon, agent.status, agent.project, agent.workspace),
+			brief = string.format(
+				"%s %s Agent: %s [%s]",
+				STATUS_ICON[agent.status] or "?",
+				agent.status,
+				agent.project,
+				agent.workspace
+			),
 			icon = "md_robot_outline",
-			action = wezterm.action_callback(function(win, p)
-				win:perform_action(act.SwitchToWorkspace({ name = agent.workspace }), p)
-			end),
+			action = switch_to_workspace(agent.workspace),
 		})
 	end
 
